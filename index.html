@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+<head>
+<title>Pixel Bird</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+* {
+    font-family: Arial;
+}
+#win {
+    width: 400px;
+    height: 400px;
+    display: block;
+    border: 1px solid #AAAAAA;
+    overflow: hidden;
+    position: relative;
+}
+#msg {
+    width: 400px;
+    position: relative;
+    clear: both;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: red;
+}
+#action {
+    width: 400px;
+    display: block;
+    float: left;
+    clear: both;
+}
+#bird {
+    width: 40px;
+    height: 40px;
+    display: block;
+    position: absolute;
+    left: 50px;
+    background: red;
+}
+#ground{
+    width: 400px;
+    height: 20px;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    background: blue;
+    z-index: 9;
+}
+.bar {
+    width: 40px;
+    display: block;
+    position: absolute;
+    background: green;
+}
+.bar-top {
+    top: 0;
+}
+.bar-bottom {
+    bottom: 0;
+}
+</style>
+<script type="text/javascript" src="/static/lib/jquery/jquery.min.js"></script>
+</head>
+<body>
+<div id="msg">&nbsp;
+</div>
+<div id="win">
+    <div id="bird">&nbsp;</div>
+    <div id="ground">&nbsp;</div>
+</div>
+<div id="action">
+</div>
+<script>
+var win_height = 400;
+var win_width = 400;
+// Main Interval in ms
+var time_interval = 10;
+var accelerate = 9.8 / 9000;
+var speed_t = 0;
+var loc_y = 0;
+var loc_ground = 380;
+
+var bird_size = 40;
+var bird_upspeed = -0.4;
+var bird_left = 50;
+var bar_blank = 150;
+var bar_width = 40;
+var bar_left_default = win_width - bar_width;
+var bar_speed = 0.2;
+var count_bars = 0;
+var bar_interval = 200;
+var game_state = 0;
+var bar_state = 0;
+
+var score = 0;
+
+var bird = $('#bird');
+
+var handle_mainloop = null;
+
+function start_main(){
+    handle_mainloop = setInterval("main_loop();", time_interval);
+    game_state = 1;
+}
+function stop_main(){
+    clearInterval(handle_mainloop);
+    game_state = 0;
+}
+
+function le_calc_bird() {
+    speed_t = speed_t + accelerate * time_interval;
+    loc_y = loc_y + (speed_t * time_interval - accelerate * time_interval * time_interval / 2);
+}
+
+function le_move_bird() {
+    bird.css('top',loc_y)
+}
+
+function le_move_bars() {
+    delta_bar_move = bar_speed * time_interval;
+    $('.bar').each(function(i, el){
+        if ($(this).offset().left - delta_bar_move < 0 - bar_width) {
+            $(this).remove();
+        } else {
+            $(this).css('left', $(this).offset().left - delta_bar_move);
+        }
+        if ($(this).offset().left < bird_left &&
+            $(this).offset().left + bar_width > bird_left) {
+            bar_state = 0.5;
+        }
+        if ($(this).offset().left + bar_width < bird_left &&
+            bar_state == 0.5) {
+            score += 1;
+            bar_state = 0;
+            msg('Passed ' + score);
+        }
+    });
+}
+
+
+function le_check_hitground() {
+    if (loc_y >= loc_ground - bird_size) {
+        when_hit(0);
+    }
+}
+
+function le_add_bar() {
+    if (count_bars % bar_interval==0){
+        create_barpair();
+        count_bars = 1;
+    } else {
+        count_bars += 1;
+    }
+}
+
+function le_check_hitbar() {
+    var birdx = bird.offset().left;
+    var birdy = Number(bird.css('top').substring(0, bird.css('top').length-2));
+    var birdw = bird_size;
+    var birdh = bird_size;
+
+    $('.bar-top').each(function(i,el){
+        var barx = $(this).offset().left;
+        var bary = 0;
+        var barw = bar_width;
+        var barh = $(this).height();
+
+        if (birdx > barx && birdx < barx+barw
+            && birdy > bary && birdy < bary+barh) {
+            when_hit(1);
+        }
+        if (birdx+birdw > barx && birdx+birdw < barx+barw
+            && birdy > bary && birdy < bary+barh){
+            when_hit(2);
+        }
+
+    });
+
+    $('.bar-bottom').each(function(i,el){
+        var barx = $(this).offset().left;
+        var bary = win_height - $(this).height();
+        var barw = bar_width;
+        var barh = $(this).height();
+
+        if (birdx > barx && birdx < +barw
+            && birdy+birdh > bary && birdy+birdh < bary+barh) {
+            when_hit(3);
+        }
+        if (birdx+birdw > barx && birdx+birdw < barx+barw
+            && birdy+birdh > bary && birdy+birdh < bary+barh){
+            when_hit(4);
+        }
+
+    });
+
+}
+
+function when_hit(n){
+    stop_main();
+    if (n==0) { msg("Down!"); }
+    else { msg('Hit bar! You passed '+score+' bar!'); };
+}
+
+function reset_vals() {
+    loc_y = 0;
+    speed_t = 0;
+    count_bars = 0;
+    score = 0;
+    game_state = 0;
+    msg('Start!');
+    $('.bar').remove();
+}
+
+function restart() {
+    reset_vals();
+    start_main();
+}
+
+function create_barpair() {
+    bar_top_height = Math.floor(Math.random()*200);
+    bar_btm_height = win_height - bar_top_height - bar_blank;
+    var bar_top = $("<div class='bar bar-top'>&nbsp;</div>")
+    var bar_btm = $("<div class='bar bar-bottom'>&nbsp;</div>")
+    bar_top.css('height', bar_top_height);
+    bar_btm.css('height', bar_btm_height);
+    bar_top.css('left', bar_left_default);
+    bar_btm.css('left', bar_left_default);
+
+    $('#win').append(bar_top);
+    $('#win').append(bar_btm);
+}
+
+function main_loop(){
+    // Order is important
+    le_calc_bird();
+    le_move_bird();
+    le_move_bars();
+    le_check_hitbar();
+    le_add_bar();
+
+    // Check something
+    le_check_hitground();
+}
+
+/*  user functions  */
+
+function fly_up() {
+    speed_t = bird_upspeed;
+}
+
+function msg(msg){
+    $('#msg').html(msg);
+}
+
+$(document).ready(function(){
+    start_main();
+    $(window).click(function(){
+        if (game_state==1) {
+            fly_up();
+        } else if (game_state==0){
+            restart();
+        }
+    });
+});
+</script>
+</body>
+</html>
